@@ -1,0 +1,306 @@
+/******************************************************************************************************************************************
+* 
+*	Name:    	Common Qlik Extract Load Script
+*	Author:  	Wombat Security 
+*	Desc:    	Extract Data Load script for the AUD, UFS and Cyber Strength applications.
+*
+******************************************************************************************************************************************
+
+// Use to Set the version with each major (N.) and minor (.N) release:
+SET v_VERSION='v0.1';
+
+/******************************************************************************************************************************************
+*
+*	ReleaseDate	Version		Developer		Notes
+*------------------------------------------------------------------------------------------------------------------------------------------
+*  	2018-08-07 	v0.1		P. Adams, Qlik		- Start of application development
+*	
+******************************************************************************************************************************************/
+
+/* MAIN TAB */
+
+
+// Load the externalized variables:
+// (Note: all variables and expressions should eventually be externalized.)
+
+Set vVariablesPathFile = ..\Common\Config\ExternalVariables.xls;
+Set vAppType =Extraction;
+
+// LOAD EXTERNAL EXTRACTION VARIABLES:
+Variables:
+LOAD
+"Variable Name",
+Value
+FROM [$(vVariablesPathFile)]
+(biff, embedded labels, table is Sheet1$)
+WHERE NOT ISNULL("Variable Name")
+AND NOT ISNULL("$(vAppType)")
+;
+Let vVarCount=RangeMax(NoOfRows('Variables'),0)-1;
+For i=0 to $(vVarCount)
+Let vTempName = peek('Variable Name',$(i),'Variables');
+Let vTempValue = peek('Value',$(i),'Variables');
+Let vLetSet = peek('Let or Set',$(i),'Variables');
+$(vLetSet) $(vTempName) = vTempValue;
+Next
+
+
+/*****************************************************************************************************/
+
+// Load Mapping Tables:
+
+CompanyFreeValueAliasMap:
+Mapping LOAD Distinct
+  wombat.companyfreevalue.id as Key,
+  alias as ReturnVal
+FROM [lib://Wombat Qlik Files/Source_QVDs\dim\companyfreevalue.qvd]
+(qvd);
+
+
+/*****************************************************************************************************/
+
+// Load Dimension Tables:
+
+Qualify *;
+
+
+// DIMENSIONS:
+
+Assignment:
+LOAD
+    assignment_key,
+    //wombat.assignment.id,
+    //wobmat.company.id,
+    //wombat.assignment.parent_id,
+    name,
+    start.date,
+    //start.time,
+    due.date,
+    //due.time,
+    //termination.date,
+    //termination.time,
+    //owner.name,
+    status,
+    //issendreminder,
+    ispriority,
+    //createddate.date,
+    //createddate.time,
+    isactive,
+    //softdeleteddate.date,
+    //softdeleteddate.time,
+    //parent.type,
+    //parent.type.description,
+    //parent.name,
+    //iscybonly,
+    isae
+    //ae.type,
+    //ae.isenabled,
+    //cyb.assessmenttype,
+    //cyb.numquestions
+FROM [lib://Wombat Qlik Files/Source_QVDs\dim\assignment.qvd]
+(qvd);
+
+
+Module:
+LOAD
+    module_key,
+    wombat.module.id,
+    name,
+    description,
+    type.description,
+    trainingmethod,
+    createddate.date,
+    createddate.time,
+    softdeleteddate.date,
+    softdeleteddate.time,
+    isactive,
+    "alias"
+FROM [lib://Wombat Qlik Files/Source_QVDs\dim\module.qvd]
+(qvd);
+
+
+
+User:
+LOAD
+    user_key,
+    //wombat.user.id,
+    //wombat.company.id,
+    email,
+    firstname,
+    lastname,
+    //openidqualifier,
+    //lastlogin.date,
+    //lastlogin.time,
+    //createddate.date,
+    //createddate.time,
+    //isinternal,
+    isactive,
+    //softdeleteddate.date,
+    //softdeleteddate.time,
+    //locale,
+    //"timezone",
+    //ismigrated,
+    isadmin,
+    adminroles
+FROM [lib://Wombat Qlik Files/Source_QVDs\dim\user_0.qvd]
+//FROM [lib://Wombat Qlik Files/Source_QVDs\dim\user_*.qvd]
+(qvd);
+
+
+UserFreeValue:
+LOAD
+    userfreevalue_key,
+    wombat.userfreevalue.id,
+    wombat.companyfreevalue.id,
+    //wombat.company.id,
+    wombat.user.id,
+    "alias",
+    userfreevalue,
+    //createddate.date,
+    //createddate.time,
+    isactive
+    //softdeleteddate.date,
+    //softdeleteddate.time
+FROM [lib://Wombat Qlik Files/Source_QVDs\dim\userfreevalue_0.qvd]
+//FROM [lib://Wombat Qlik Files/Source_QVDs\dim\userfreevalue_*.qvd]
+(qvd);
+
+
+
+/*****************************************************************************************************/
+
+// Load Fact Tables:
+
+//AUD:
+//LOAD
+//    //assessmentuser_uuid,
+//    //assignmentuser_uuid,
+//    aud_key,
+//    //company_key,
+//    assessment_key,
+//    user_key,
+//    assignment_key,
+//    date_key,
+//    //wombat.company.id,
+//    //assessmentdevice.id,
+//    //lastuserassessmentevent.date,
+//    //lastuserassessmentevent.time,
+//    //views.total,
+//    //views.unique,
+//    //clicks.total,
+//    //clicks.unique,
+//    //attachmentopens.total,
+//    //attachmentopens.unique,
+//    //submits.total,
+//    //submits.unique,
+//    //fails.total,
+//    //fails.unique,
+//    //tms.sent.total,
+//    //tms.sent.unique,
+//    //tms.completed.total,
+//    //tms.completed.unique,
+//    //sentdevices
+//FROM [lib://Wombat Qlik Files/Source_QVDs\fact\aud.qvd]
+//(qvd);
+
+
+
+//[AUD Vulnerability]:
+//LOAD
+//    aud_key,
+//    company_key,
+//    assessment_key,
+//    user_key,
+//    assignment_key,
+//    assessmentdevice.id,
+//    vulnerability.json,
+//    vulnerable.adobeflash,
+//    vulnerable.adobepdf,
+//    vulnerable.java,
+//    vulnerable.quicktime,
+//    vulnerable.realplayer,
+//    vulnerable.silverlight,
+//    vulnerable.wmp
+//FROM [lib://Wombat Qlik Files/Source_QVDs\fact\aud_vulnerability.qvd]
+//(qvd);
+
+
+// assignment user module:
+AUM:
+LOAD
+    assignment_key,
+    user_key,
+    //company_key,
+    module_key,
+    //wombat.aum.id,
+    //wombat.company.id,
+    status,
+    datecompleted.date,
+    datecompleted.time,   /* Used in TZ Shift */
+    forcecompleted,   /* Used in TZ Shift */
+    //createddate.date,
+    //createddate.time,
+    activeflag
+    //softdeleteddate.date,
+    //softdeleteddate.time
+FROM [lib://Wombat Qlik Files/Source_QVDs\fact\aum.qvd]
+(qvd);
+
+
+[AUM Attempt]:
+LOAD
+    // company_key,
+    user_key,
+    module_key,
+    // moduleversion_key,
+    assignment_key,
+    // date_key,
+    // time_key,
+    // wombat.company.id,
+    // wombat.attempt.id,
+    // wombat.aum.id,
+    attemptdate.date,
+    attemptdate.time,   /* Used in TZ Shift */
+    // endstatus,
+    timetocomplete.seconds,
+    score.user,
+    score.max
+    // action.first,
+    // action.last
+FROM [lib://Wombat Qlik Files/Source_QVDs\fact\aumattempt.qvd]
+(qvd);
+
+
+
+
+/*****************************************************************************************************/
+
+
+// Clean up temporary variables and Variables table:
+For i=0 to $(vVarCount)
+Let vTempVarName = peek('Variable Name',$(i),'Variables');
+If Left(vTempVarName,5) = 'vTemp' then
+Let $(vTempVarName) = Null();
+Endif
+Next
+Let vTempName = Null();
+Let vTempValue = Null();
+Let vVarCount = Null();
+Let vTempVarName = Null();
+Let vTempVarValue = Null();
+Let i = Null();
+Drop table Variables;
+
+
+/*****************************************************************************************************/
+
+
+Trace End of Load Script;
+
+Exit Script;
+
+
+/*****************************************************************************************************/
+
+
+

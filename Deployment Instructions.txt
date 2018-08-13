@@ -1,0 +1,50 @@
+Deployment Instructions for AUD, UFS and CYB Qlik Sense Applications
+====================================================================
+
+1) Create the network share where the shared application support files
+   will reside.
+
+2) Create a folder beneath it to hold the shared support files and copy
+   this project folder into it.  It does not have to be called "QS_Apps".
+
+3) In the Qlik Management Console, Import the four apps found in the 
+   "Exported Apps" folder.
+
+Note: At this time, the Extract portion of the ETL is not functional.
+In the meantime, create QVD as you have previously and copy them into 
+the "Source_QVDs" folder after the project folder is deployed. This is
+only to support testing.
+
+4) In the Hub, open the "Wombat Transform" app into the data load editor.
+
+5) Create a new data connection called "Wombat Qlik Files".  It should 
+   point to the parent folder of "Source_QVDs".  Go into the Qlik 
+   Management Console and edit the Connection name to remove the 
+   ([USER ID]) suffix.  Wait 10 minutes.
+
+6) Once the new Connection Name is visible in the connections list, run 
+   the load in the "Wombat Transform" app.  Debug any errors reported.
+
+7) Upon successful completion, open and reload the app "Wombat AUM Schema".
+   Debug any errors reported.
+
+8) Upon successful completion, open and reload the app "Wombat Assignment 
+   User Details".  Debug any errors reported.  
+
+9) Test the app by navigating to the "App Overview" and open the sheet
+   "Pick User ID".  Select a user for testing to simulate section access
+   security before it is enabled (Only this user's company data will be 
+   visible.  Then navigate to the "Assignment User Detail" for testing.
+
+   Some suggested Test Users Include:
+   - Test user: WOMBAT\464253  (Has Company Custom Fields) 
+   - Test user: WOMBAT\462150  (Has Bar Graph values (co. 284)) 
+   - Test user: WOMBAT\470108  (Has some Attempt Scores for Detail Table Chart.)
+
+=======================================
+
+Deployment instructions for UFS and CYB will be added later as they become available.
+
+Production deployment will have additional steps such a setting up reload tasks.
+More to follow.
+

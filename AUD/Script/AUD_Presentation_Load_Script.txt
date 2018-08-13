@@ -1,0 +1,217 @@
+/******************************************************************************************************************************************
+* 
+*	Name:    	AUM Qlik Presentation Load Script
+*	Author:  	Wombat Security 
+*	Desc:    	Presentation Data Load script for the AUD application.
+*
+******************************************************************************************************************************************
+
+// Use to Set the version with each major (N.) and minor (.N) release:
+SET v_VERSION='v0.2';
+
+/******************************************************************************************************************************************
+*
+*	ReleaseDate	Version		Developer		Notes
+*------------------------------------------------------------------------------------------------------------------------------------------
+*  	2018-08-07 	v0.1		P. Adams, Qlik		- Start of application development
+*  	2018-08-13 	v0.2		P. Adams, Qlik		- Version 1 pre-released for testing.
+*	
+******************************************************************************************************************************************/
+
+/* MAIN TAB */
+
+// Load the externalized variables:
+// (Note: all variables and expressions should eventually be externalized.)
+
+Set vVariablesPathFile = ..\Common\Config\ExternalVariables.xls;
+Set vAppType =Presentation-AUD;
+
+// LOAD EXTERNAL EXTRACTION VARIABLES:
+Variables:
+LOAD
+"Variable Name",
+Value
+FROM [$(vVariablesPathFile)]
+(biff, embedded labels, table is Sheet1$)
+WHERE NOT ISNULL("Variable Name")
+AND NOT ISNULL("$(vAppType)")
+;
+Let vVarCount=RangeMax(NoOfRows('Variables'),0)-1;
+For i=0 to $(vVarCount)
+Let vTempName = peek('Variable Name',$(i),'Variables');
+Let vTempValue = peek('Value',$(i),'Variables');
+Let vLetSet = peek('Let or Set',$(i),'Variables');
+$(vLetSet) $(vTempName) = vTempValue;
+Next
+
+
+/*****************************************************************************************************/
+// Customize smart search indexing for faster reloads...
+
+// Do not create search indexes on reload, rather on the first search operation.
+Set CreateSearchIndexOnReload=0;
+// Exclude these ID fields from Smart Search to speed up indexing later:
+Search Exclude [*];
+
+/*****************************************************************************************************/
+
+// Load Mapping Tables:
+
+/*****************************************************************************************************/
+
+
+// Contruct the Detail Standard Fields table from a config variable:
+[Detail Standard Fields]:
+Load 
+  SubField('$(vAudDetailFields)',';') as [%Standard Detail Fields]
+AutoGenerate(1);  
+
+
+/*****************************************************************************************************/
+
+
+// Load Dimension Tables:
+
+User:
+LOAD
+    "%User Key",
+    Email,
+    "First Name",
+    "Last Name",
+    "User Status",
+    "Is Admin",
+    "Admin Roles",
+    "%User Count"
+FROM [lib://Wombat Qlik Files/QVDs\Schema\dim\user.qvd] (qvd);
+
+
+// Section Access;
+
+[Authorization]:
+Load
+   USERID,
+   ACCESS,
+   "%Company ID",
+   [User Timezone Offset]
+FROM [lib://Wombat Qlik Files/QVDs\Schema\dim\authorization.qvd] (qvd);
+
+// Section Application;
+
+
+
+// Need a VISIBLE table holding the offsets linked to Authorization
+// so that [User Timezone Offset] is visible.
+[Time Zone Offset]:
+Load Distinct
+   [User Timezone Offset]
+FROM [lib://Wombat Qlik Files/QVDs\Schema\dim\authorization.qvd] (qvd);
+
+
+
+Assignment:
+LOAD
+    "%Assignment Key",
+    "%Company ID",
+    Assignment,
+    "Assignment Start Timestamp",
+    "Assignment Due Timestamp",
+    "Assignment Status",
+    "Assignment Is Priority",
+    "Assignment Is Active",
+    "Assignment Is Auto Enrolled",
+    "%Assignment Count"
+FROM [lib://Wombat Qlik Files/QVDs\Schema\dim\assignment.qvd] (qvd);
+
+
+[UFV Names]:
+LOAD
+    "%Company ID",
+    "Table Custom Columns" as "%Table Custom Columns",
+    "%UFV Name ID"
+FROM [lib://Wombat Qlik Files/QVDs\Schema\dim\ufv_names.qvd] (qvd);
+
+
+[UFV Values]:
+LOAD
+    "%User Key",
+    "Free Value 1",
+    "Free Value 2",
+    "Free Value 3",
+    "Free Value 4",
+    "Free Value 5",
+    "Free Value 6",
+    "Free Value 7",
+    "Free Value 8",
+    "Free Value 9",
+    "Free Value 10",
+    "Free Value 11",
+    "Free Value 12",
+    "Free Value 13",
+    "Free Value 14",
+    "Free Value 15"
+FROM [lib://Wombat Qlik Files/QVDs\Schema\dim\ufv_values.qvd] (qvd);
+
+
+
+
+/*****************************************************************************************************/
+
+// Load Fact Tables:
+
+
+// assignment user module:
+AUM:
+LOAD
+    [%AUM Key],
+    "%Assignment Key",
+    "%User Key",
+    "Module",
+    "Module Status",
+    "Module Completed Timestamp",
+    "Force Completed Timestamp",
+    "User Assignment Status"
+FROM [lib://Wombat Qlik Files/QVDs\Schema\fact\aum.qvd] (qvd);
+
+
+
+[AUM Attempt]:
+LOAD
+    [%AUM Key],
+    "Attempt Timestamp",
+    "Seconds To Complete",
+    "Attempt Score",
+    "Max Possible Score"
+FROM [lib://Wombat Qlik Files/QVDs\Schema\fact\aum_attempt.qvd] (qvd);
+
+
+/*****************************************************************************************************/
+
+
+// Clean up temporary variables and Variables table:
+For i=0 to $(vVarCount)
+Let vTempVarName = peek('Variable Name',$(i),'Variables');
+If Left(vTempVarName,5) = 'vTemp' then
+Let $(vTempVarName) = Null();
+Endif
+Next
+Let vTempName = Null();
+Let vTempValue = Null();
+Let vVarCount = Null();
+Let vTempVarName = Null();
+Let vTempVarValue = Null();
+Let i = Null();
+Drop table Variables;
+
+
+/*****************************************************************************************************/
+
+
+Trace End of Load Script;
+
+Exit Script;
+
+
+/*****************************************************************************************************/
+
+
+

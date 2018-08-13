@@ -1,0 +1,234 @@
+/******************************************************************************************************************************************
+* 
+*	Name:    	AUM Qlik Schema Load Script
+*	Author:  	Wombat Security 
+*	Desc:    	Schema Data Load script for the AUD application.
+*
+******************************************************************************************************************************************
+
+// Use to Set the version with each major (N.) and minor (.N) release:
+SET v_VERSION='v0.2';
+
+/******************************************************************************************************************************************
+*
+*	ReleaseDate	Version		Developer		Notes
+*------------------------------------------------------------------------------------------------------------------------------------------
+*  	2018-08-07 	v0.1		P. Adams, Qlik		- Start of application development
+*  	2018-08-13 	v0.2		P. Adams, Qlik		- Version 1 pre-released for testing.
+*	
+******************************************************************************************************************************************/
+
+/* MAIN TAB */
+
+
+// Load the externalized variables:
+// (Note: all variables and expressions should eventually be externalized.)
+
+Set vVariablesPathFile = ..\Common\Config\ExternalVariables.xls;
+Set vAppType =Schema-AUD;
+
+// LOAD EXTERNAL EXTRACTION VARIABLES:
+Variables:
+LOAD
+"Variable Name",
+Value
+FROM [$(vVariablesPathFile)]
+(biff, embedded labels, table is Sheet1$)
+WHERE NOT ISNULL("Variable Name")
+AND NOT ISNULL("$(vAppType)")
+;
+Let vVarCount=RangeMax(NoOfRows('Variables'),0)-1;
+For i=0 to $(vVarCount)
+Let vTempName = peek('Variable Name',$(i),'Variables');
+Let vTempValue = peek('Value',$(i),'Variables');
+Let vLetSet = peek('Let or Set',$(i),'Variables');
+$(vLetSet) $(vTempName) = vTempValue;
+Next
+
+
+/*****************************************************************************************************/
+
+// Load Mapping Tables:
+
+[Offsets Map]:
+Mapping LOAD
+    [TZ*]                    as Key, 
+    'GMT' & [UTC offset]     as Return
+FROM [lib://Wombat Qlik Files/Common\Reference\UTC Offsets.xlsx]
+(ooxml, embedded labels, header is 2 lines, table is Sheet1);
+
+/*****************************************************************************************************/
+
+// Load Dimension Tables:
+
+User:
+LOAD
+    "%User Key",
+    //"%User ID",
+    //"%Company ID",
+    Email,
+    "First Name",
+    "Last Name",
+    "User Status",
+    //"Time Zone",
+    "Is Admin",
+    "Admin Roles",
+    1 as [%User Count]
+FROM [lib://Wombat Qlik Files/QVDs\Transform\dim\user.qvd] (qvd);
+
+Store [User] into [lib://Wombat Qlik Files/QVDs\Schema\dim\user.qvd] (qvd);
+Drop Table [User];
+
+
+
+[Authorization]:
+Load Distinct
+   Upper('$(vNetworkDomain)' &'\' & "%User ID") as USERID,
+   'USER' as ACCESS,
+   "%Company ID",
+   ApplyMap('Offsets Map', "Time Zone", Null()) as [User Timezone Offset]
+FROM [lib://Wombat Qlik Files/QVDs\Transform\dim\user.qvd] (qvd);
+
+/* Concatenate ADMIN accounts before turning on Section Access */
+Concatenate (Authorization)
+Load * Inline [
+   USERID,                ACCESS, Company ID, User Timezone Offset
+   INTERNAL\SA_SCHEDULER, ADMIN,            ,        
+   QTSEL\PAD,             ADMIN,            ,        
+];
+
+Store [Authorization] into [lib://Wombat Qlik Files/QVDs\Schema\dim\authorization.qvd] (qvd);
+Drop Table [Authorization];
+
+
+
+
+
+// Use an expression similar to this fomula in the front-end:
+    //Floor(ConvertToLocalTime(forcecompleted, $(=Only([User Timezone Offset])), False())) as new_forcecompleted_date,
+
+
+
+Assignment:
+LOAD
+    "%Assignment Key",
+    "%Company ID",
+    Assignment,
+    "Assignment Start Timestamp",
+    "Assignment Due Timestamp",
+    "Assignment Status",
+    "Assignment Is Priority",
+    "Assignment Is Active",
+    "Assignment Is Auto Enrolled",
+    1 as [%Assignment Count]
+FROM [lib://Wombat Qlik Files/QVDs\Transform\dim\assignment.qvd] (qvd);
+
+Store [Assignment] into [lib://Wombat Qlik Files/QVDs\Schema\dim\assignment.qvd] (qvd);
+Drop Table [Assignment];
+
+
+
+[UFV Names]:
+LOAD
+    "%Company ID",
+    "%UFV Name" as [Table Custom Columns],
+    "%UFV Name ID"
+FROM [lib://Wombat Qlik Files/QVDs\Transform\dim\ufv_names.qvd] (qvd);
+
+Store [UFV Names] into [lib://Wombat Qlik Files/QVDs\Schema\dim\ufv_names.qvd] (qvd);
+Drop Table [UFV Names];
+
+
+[UFV Values]:
+LOAD
+    "%User Key",
+    "Free Value 1",
+    "Free Value 2",
+    "Free Value 3",
+    "Free Value 4",
+    "Free Value 5",
+    "Free Value 6",
+    "Free Value 7",
+    "Free Value 8",
+    "Free Value 9",
+    "Free Value 10",
+    "Free Value 11",
+    "Free Value 12",
+    "Free Value 13",
+    "Free Value 14",
+    "Free Value 15"
+FROM [lib://Wombat Qlik Files/QVDs\Transform\dim\ufv_values.qvd] (qvd);
+
+Store [UFV Values] into [lib://Wombat Qlik Files/QVDs\Schema\dim\ufv_values.qvd] (qvd);
+Drop Table [UFV Values];
+
+
+
+
+/*****************************************************************************************************/
+
+// Load Fact Tables:
+
+
+// assignment user module:
+AUM:
+LOAD
+    [%AUM Key],
+    "%Assignment Key",
+    "%User Key",
+    "Module",
+    "Module Status",
+    "Module Completed Timestamp",
+    "Force Completed Timestamp",
+    "User Assignment Status"
+FROM [lib://Wombat Qlik Files/QVDs\Transform\fact\aum.qvd] (qvd);
+
+Store [AUM] into [lib://Wombat Qlik Files/QVDs\Schema\fact\aum.qvd] (qvd);
+Drop Table [AUM];
+
+
+
+[AUM Attempt]:
+LOAD
+    [%AUM Key],
+    "Attempt Timestamp",
+    "Seconds To Complete",
+    "Attempt Score",
+    "Max Possible Score"
+FROM [lib://Wombat Qlik Files/QVDs\Transform\fact\aum_attempt.qvd] (qvd);
+
+Store [AUM Attempt] into [lib://Wombat Qlik Files/QVDs\Schema\fact\aum_attempt.qvd] (qvd);
+Drop Table [AUM Attempt];
+
+
+/*****************************************************************************************************/
+
+
+// Clean up temporary variables and Variables table:
+For i=0 to $(vVarCount)
+Let vTempVarName = peek('Variable Name',$(i),'Variables');
+If Left(vTempVarName,5) = 'vTemp' then
+Let $(vTempVarName) = Null();
+Endif
+Next
+Let vTempName = Null();
+Let vTempValue = Null();
+Let vVarCount = Null();
+Let vTempVarName = Null();
+Let vTempVarValue = Null();
+Let i = Null();
+Drop table Variables;
+
+
+/*****************************************************************************************************/
+
+
+Trace End of Load Script;
+
+Exit Script;
+
+
+/*****************************************************************************************************/
+
+
+
